@@ -8,7 +8,7 @@ export async function deleteUser(id:string){
         })
         
         if(r.affectedRows == 0){
-            return false;
+            throw new UserError("INVALID_ID");
         }
         else{
             return true;
