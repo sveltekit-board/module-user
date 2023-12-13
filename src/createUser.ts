@@ -1,5 +1,6 @@
 import { runQuery } from "@sveltekit-board/db"
 import { UserError } from "./error"
+import getUser from "./getUser"
 
 interface userOption{
     id:string
@@ -20,9 +21,21 @@ export async function createUser(option:userOption){
         email = null;
     }
 
+    if(await getUser.byId(option.id)){
+        throw new UserError("DUPLICATED_ID");
+    }
+    if(option.email){
+        if(await getUser.byEmail(option.email)){
+            throw new UserError("DUPLICATED_EMAIL");
+        }
+    }
+    if(await getUser.byNickname(option.nickname)){
+        throw new UserError("DUPLICATED_NICKNAME");
+    }
+
     try{
         await runQuery(async(run) => {
-            return await run("INSERT INTO `user` (`id`, `password`, `email`, `verified`, `nickname`, `grade`, `registerIp`) VALUES (?, ?, ?,?, ?, ?, ?)", [option.id, option.password, email, option.verified, option.nickname, option.grade, option.registerIp]);
+            return await run("INSERT INTO `user` (`id`, `password`, `email`, `verified`, `nickname`,`grade`, `register_ip`, `nick_date`, `register_date`) VALUES (?, ?, ?,?, ?, ?, ?, NOW(), NOW())", [option.id, option.password, email, option.verified, option.nickname, option.grade, option.registerIp]);
         })
     }
     catch(err){

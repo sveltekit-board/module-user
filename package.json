@@ -10,7 +10,7 @@
   "author": "hotsixman",
   "license": "ISC",
   "dependencies": {
-    "@sveltekit-board/db": "^0.1.0",
+    "@sveltekit-board/db": "^0.3.0",
     "typescript": "^5.3.3"
   }
 }
