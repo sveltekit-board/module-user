@@ -6,7 +6,7 @@ let alterNickname = async function(id:string, nickname:string){
         return await runQuery(async(run) => {
             let same = false;
             try{
-                let r = await run("SELECT * FROM `user` WHERE `id` = ? AND `nickname` = ?", [id, nickname])['0'];
+                let r = (await run("SELECT * FROM `user` WHERE `id` = ? AND `nickname` = ?", [id, nickname]))['0'];
                 if(r){
                     same = true;
                 }
@@ -39,7 +39,7 @@ let alterPassword = async function(id:string, password:string){
         return await runQuery(async(run) => {
             let same = false;
             try{
-                let r = await run("SELECT * FROM `user` WHERE `id` = ? AND `password` = ?", [id, password])['0'];
+                let r = (await run("SELECT * FROM `user` WHERE `id` = ? AND `password` = ?", [id, password]))['0'];
                 if(r){
                     same = true;
                 }
