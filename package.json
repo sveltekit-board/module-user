@@ -1,6 +1,6 @@
 {
 	"name": "@sveltekit-board/user",
-	"version": "0.2.0",
+	"version": "0.3.0",
 	"description": "simple user library for sveltekit",
 	"author": {
 		"name": "hotsixman",
