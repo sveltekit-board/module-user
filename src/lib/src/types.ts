@@ -1,4 +1,4 @@
-export interface User {
+export interface UserData {
     order: number;
 
     provider: string;
@@ -11,15 +11,15 @@ export interface User {
 
     grade: number;
 
-    profileImage: string;
+    profileImage: string | null;
 }
 
-export interface UserData {
+export interface UserCreatingData {
     provider: string;
     providerId: string;
     name: string | null;
     nickname: string;
-    profileImage: string;
+    profileImage: string | null;
 }
 
 export type UserMethodResult<T = any> = { success: true, data?: T } | {success:false, error?: string}

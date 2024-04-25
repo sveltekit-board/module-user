@@ -1,5 +1,5 @@
 import { runQuery } from "@sveltekit-board/db";
-import { type UserData, type UserMethodResult } from './types.js'
+import { type UserCreatingData, type UserData, type UserMethodResult } from './types.js'
 
 export default class User {
     provider: string;
@@ -10,7 +10,7 @@ export default class User {
      * 만약 형식이 올바르지 않다면 해당 테이블을 DROP 합니다.
      * @returns 
      */
-    static async checkTable() {
+    static async checkTable(): Promise<boolean> {
         return await runQuery(async (run) => {
             const result = await run("SHOW TABLES");
             if(result.length === 0){
@@ -81,7 +81,7 @@ export default class User {
      * @param data 
      * @returns 
      */
-    static async createNewUser(data: UserData): Promise<User | null> {
+    static async createNewUser(data: UserCreatingData): Promise<User | null> {
         const userExists = await runQuery(async (run) => {
             let result = await run("SELECT EXISTS(SELECT * FROM `user` WHERE `provider` = ? AND`providerId` = ?);", [data.provider, data.providerId]);
             return Boolean(Object.values(result[0])[0]);
@@ -101,6 +101,36 @@ export default class User {
     constructor(provider: string, providerId: string) {
         this.provider = provider;
         this.providerId = providerId;
+    }
+    
+    /**
+     * db에서 유저 데이터를 가져와 반환합니다.
+     * @param {undefined | string[]} columns 가져올 열의 이름을 배열로 나타냅니다. 파라미터가 없으면 모든 열을 가져옵니다.
+     * @returns 
+     */
+    async getData(): Promise<UserMethodResult<UserData>>
+    async getData(columns:string[]): Promise<UserMethodResult<Partial<UserData>>>
+    async getData(columns?:string[]): Promise<UserMethodResult> {
+        let result = await runQuery(async(run) => {
+            if(columns){
+                const columnQuery = columns.map(e => `\`${e}\``).join(' ,')
+                return await run("SELECT " + columnQuery + " FROM `user` WHERE `provider` = ?, `providerId` = ?", [this.provider, this.providerId]);
+            }
+            else{
+                return await run("SELECT * FROM `user` WHERE `provider` = ?, `providerId` = ?", [this.provider, this.providerId]);
+            }
+        })
+
+        if(result.length === 0){
+            return {
+                success: false,
+                error: 'USER_DOES_NOT_EXISTS'
+            }
+        }
+        return {
+            success: true,
+            data: result[0]
+        }
     }
 
     /**
@@ -122,7 +152,7 @@ export default class User {
                 if (result[0].nicknameChangedTime !== null && result[0].nicknameChangedTime + cooldown * 1000 > Date.now()) {
                     return {
                         success: false,
-                        error: 'CHECK_NICKNAMECHANGE_COOLDOWN'
+                        error: 'CHECK_NICKNAME_CHANGE_COOLDOWN'
                     };
                 }
                 if (result[0].nickname === nickname) {
@@ -143,7 +173,6 @@ export default class User {
     /**
      * 유저의 이름을 설정합니다.
      * @param nickname 설정할 이름입니다.
-     * @param cooldown 이름 변경 쿨타임입니다. 초 단위입니다.
      * @returns 
      */
     async setName(nickname: string): Promise<UserMethodResult> {
@@ -200,7 +229,7 @@ export default class User {
             else if (result.changedRows === 0) {
                 return {
                     success: false,
-                    error: 'NAME_ALREADY_USING'
+                    error: 'NO_GRADE_CHANGE'
                 }
             }
             else {
@@ -230,7 +259,7 @@ export default class User {
             else if (result.changedRows === 0) {
                 return {
                     success: false,
-                    error: 'NAME_ALREADY_USING'
+                    error: 'NO_PROFILE_IMAGE_CHANGE'
                 }
             }
             else {

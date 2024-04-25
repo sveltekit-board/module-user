@@ -1,6 +1,13 @@
 {
-	"name": "user",
-	"version": "0.0.1",
+	"name": "@sveltekit-board/user",
+	"version": "0.1.0",
+	"description": "simple user library for sveltekit",
+	"author": {
+		"name": "hotsixman",
+		"email": "hotsixman05@gmail.com",
+		"url": "https://github.com/hotsixman"
+	},
+	"keywords": ["svelte", "sveltekit", "user", "auth"],
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build && npm run package",
