@@ -7,19 +7,53 @@ export default class User {
 
     /**
      * user 테이블이 있는지, 테이블의 컬럼의 타입은 맞는지 체크합니다. 단, AUTO_INCREMENT 등의 **추가적인** 내용은 체크하지 않습니다.
+     * 만약 형식이 올바르지 않다면 해당 테이블을 DROP 합니다.
      * @returns 
      */
-    static async checkDB() {
+    static async checkTable() {
         return await runQuery(async (run) => {
-            const tables = Object.values((await run("SHOW TABLES"))[0]);
+            const result = await run("SHOW TABLES");
+            if(result.length === 0){
+                return false;
+            }
+            
+            const tables = Object.values((result)[0]);
             if (!tables.includes('user')) return false;
-
+            
             const columns: any[] = await run("SHOW COLUMNS from `user`");
             if (Object.values(userSchema).length !== Object.values(columns).length) return false;
-
-            return Object.keys(userSchema).every((key) => {
-                return columns.find(r => r.Field === key)?.Type === userSchema[key as keyof typeof userSchema];
+            
+            const isCorrect =  Object.keys(userSchema).every((key) => {
+                const b =  columns.find(r => r.Field === key)?.Type === userSchema[key as keyof typeof userSchema];
+                return b;
             })
+
+            if(!isCorrect){
+                await run("DROP TABLE `user`")
+            }
+
+            return isCorrect;
+        })
+    }
+    /**
+     * user 테이블을 생성합니다. `checkDB` 메소드로 테이블이 있는지 확인한 후 사용하세요.
+     * @returns 
+     */
+    static async createTable() {
+        return await runQuery(async (run) => {
+            await run(/*sql*/`\
+            CREATE TABLE \`user\` (
+                \`order\` int(11) NOT NULL,
+                \`provider\` tinytext NOT NULL,
+                \`providerId\` text NOT NULL,
+                \`name\` tinytext DEFAULT NULL,
+                \`nickname\` tinytext NOT NULL,
+                \`nicknameChangedTime\` bigint(20) UNSIGNED DEFAULT NULL,
+                \`registerTime\` bigint(20) UNSIGNED NOT NULL,
+                \`grade\` tinyint(3) UNSIGNED NOT NULL,
+                \`profileImage\` mediumtext DEFAULT NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+            `)
         })
     }
     /**
@@ -76,22 +110,22 @@ export default class User {
      * @returns 
      */
     async setNickname(nickname: string, cooldown?: number): Promise<UserMethodResult> {
-        return await runQuery(async(run): Promise<UserMethodResult> => {
-            if(cooldown){
-                const result: {nicknameChangedTime:number, nickname: string}[] = await run("SELECT `nicknameChangedTime`, `nickname` FROM `user` WHERE `provider` = ? AND `providerId` = ?", [this.provider, this.providerId]);
-                if(result.length === 0){
+        return await runQuery(async (run): Promise<UserMethodResult> => {
+            if (cooldown) {
+                const result: { nicknameChangedTime: number, nickname: string }[] = await run("SELECT `nicknameChangedTime`, `nickname` FROM `user` WHERE `provider` = ? AND `providerId` = ?", [this.provider, this.providerId]);
+                if (result.length === 0) {
                     return {
                         success: false,
                         error: 'USER_DOES_NOT_EXISTS'
                     }
                 }
-                if(result[0].nicknameChangedTime !== null && result[0].nicknameChangedTime + cooldown * 1000 > Date.now()){
+                if (result[0].nicknameChangedTime !== null && result[0].nicknameChangedTime + cooldown * 1000 > Date.now()) {
                     return {
                         success: false,
                         error: 'CHECK_NICKNAMECHANGE_COOLDOWN'
                     };
                 }
-                if(result[0].nickname === nickname){
+                if (result[0].nickname === nickname) {
                     return {
                         success: false,
                         error: 'NICKNAME_ALREADY_USING'
@@ -113,16 +147,16 @@ export default class User {
      * @returns 
      */
     async setName(nickname: string): Promise<UserMethodResult> {
-        return await runQuery(async(run): Promise<UserMethodResult> => {
+        return await runQuery(async (run): Promise<UserMethodResult> => {
             const result = await run("UPDATE `user` SET `name` = ? WHERE `provider` = ? AND `providerId` = ?", [nickname, this.provider, this.providerId]);
 
-            if(result.affectedRows === 0){
+            if (result.affectedRows === 0) {
                 return {
                     success: false,
                     error: 'USER_DOES_NOT_EXISTS'
                 }
             }
-            else if(result.changedRows === 0){
+            else if (result.changedRows === 0) {
                 return {
                     success: false,
                     error: 'NAME_ALREADY_USING'
@@ -136,34 +170,34 @@ export default class User {
             }
         })
     }
-    
+
     /**
      * 사용자의 등급을 설정합니다.
      * @param grade 0~255의 정수여야합니다.
      */
-    async setGrade(grade: number): Promise<UserMethodResult>{
-        if(!Number.isInteger(grade)){
+    async setGrade(grade: number): Promise<UserMethodResult> {
+        if (!Number.isInteger(grade)) {
             return {
                 success: false,
                 error: "GRADE_MUST_BE_INTEGER"
             }
         }
-        if(grade < 0 || grade > 255){
+        if (grade < 0 || grade > 255) {
             return {
                 success: false,
                 error: "CHECK_GRADE_RANGE"
             }
         }
-        return await runQuery(async(run): Promise<UserMethodResult> => {
+        return await runQuery(async (run): Promise<UserMethodResult> => {
             const result = await run("UPDATE `user` SET `grade` = ? WHERE `provider` = ? AND `providerId` = ?", [grade, this.provider, this.providerId]);
 
-            if(result.affectedRows === 0){
+            if (result.affectedRows === 0) {
                 return {
                     success: false,
                     error: 'USER_DOES_NOT_EXISTS'
                 }
             }
-            else if(result.changedRows === 0){
+            else if (result.changedRows === 0) {
                 return {
                     success: false,
                     error: 'NAME_ALREADY_USING'
@@ -183,17 +217,17 @@ export default class User {
      * @param image base64로 인코딩된 이미지 또는 url 등
      * @returns 
      */
-    async setProfileImage(image: string): Promise<UserMethodResult>{
-        return await runQuery(async(run): Promise<UserMethodResult> => {
+    async setProfileImage(image: string): Promise<UserMethodResult> {
+        return await runQuery(async (run): Promise<UserMethodResult> => {
             const result = await run("UPDATE `user` SET `profileImage` = ? WHERE `provider` = ? AND `providerId` = ?", [image, this.provider, this.providerId]);
 
-            if(result.affectedRows === 0){
+            if (result.affectedRows === 0) {
                 return {
                     success: false,
                     error: 'USER_DOES_NOT_EXISTS'
                 }
             }
-            else if(result.changedRows === 0){
+            else if (result.changedRows === 0) {
                 return {
                     success: false,
                     error: 'NAME_ALREADY_USING'
