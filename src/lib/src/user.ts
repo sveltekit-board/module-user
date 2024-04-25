@@ -136,6 +136,77 @@ export default class User {
             }
         })
     }
+    
+    /**
+     * 사용자의 등급을 설정합니다.
+     * @param grade 0~255의 정수여야합니다.
+     */
+    async setGrade(grade: number): Promise<UserMethodResult>{
+        if(!Number.isInteger(grade)){
+            return {
+                success: false,
+                error: "GRADE_MUST_BE_INTEGER"
+            }
+        }
+        if(grade < 0 || grade > 255){
+            return {
+                success: false,
+                error: "CHECK_GRADE_RANGE"
+            }
+        }
+        return await runQuery(async(run): Promise<UserMethodResult> => {
+            const result = await run("UPDATE `user` SET `grade` = ? WHERE `provider` = ? AND `providerId` = ?", [grade, this.provider, this.providerId]);
+
+            if(result.affectedRows === 0){
+                return {
+                    success: false,
+                    error: 'USER_DOES_NOT_EXISTS'
+                }
+            }
+            else if(result.changedRows === 0){
+                return {
+                    success: false,
+                    error: 'NAME_ALREADY_USING'
+                }
+            }
+            else {
+                return {
+                    success: true,
+                    data: result
+                }
+            }
+        })
+    }
+
+    /**
+     * 사용자의 프로필 이미지를 설정합니다.
+     * @param image base64로 인코딩된 이미지 또는 url 등
+     * @returns 
+     */
+    async setProfileImage(image: string): Promise<UserMethodResult>{
+        return await runQuery(async(run): Promise<UserMethodResult> => {
+            const result = await run("UPDATE `user` SET `profileImage` = ? WHERE `provider` = ? AND `providerId` = ?", [image, this.provider, this.providerId]);
+
+            if(result.affectedRows === 0){
+                return {
+                    success: false,
+                    error: 'USER_DOES_NOT_EXISTS'
+                }
+            }
+            else if(result.changedRows === 0){
+                return {
+                    success: false,
+                    error: 'NAME_ALREADY_USING'
+                }
+            }
+            else {
+                return {
+                    success: true,
+                    data: result
+                }
+            }
+        })
+    }
 }
 
 const userSchema = {

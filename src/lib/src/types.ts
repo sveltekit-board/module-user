@@ -22,4 +22,4 @@ export interface UserData {
     profileImage: string;
 }
 
-export type UserMethodResult = { success: true, data?: any } | {success:false, error?: any}
+export type UserMethodResult<T = any> = { success: true, data?: T } | {success:false, error?: string}
