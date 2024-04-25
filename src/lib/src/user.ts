@@ -54,6 +54,10 @@ export default class User {
                 \`profileImage\` mediumtext DEFAULT NULL
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
             `)
+
+            await run("ALTER TABLE `user` ADD PRIMARY KEY (`order`);");
+
+            await run("ALTER TABLE `user` MODIFY `order` int(11) NOT NULL AUTO_INCREMENT;");
         })
     }
     /**
@@ -64,7 +68,7 @@ export default class User {
      */
     static async getUser(provider: string, providerId: string): Promise<User | null> {
         const userExists = await runQuery(async (run) => {
-            let result = await run("SELECT EXISTS(SELECT * FROM `user` WHERE `provider` = ? AND`providerId` = ?);", [provider, providerId]);
+            let result = await run("SELECT EXISTS(SELECT * FROM `user` WHERE `provider` = ? AND `providerId` = ?);", [provider, providerId]);
             return Boolean(Object.values(result[0])[0]);
         })
 
@@ -83,7 +87,7 @@ export default class User {
      */
     static async createNewUser(data: UserCreatingData): Promise<User | null> {
         const userExists = await runQuery(async (run) => {
-            let result = await run("SELECT EXISTS(SELECT * FROM `user` WHERE `provider` = ? AND`providerId` = ?);", [data.provider, data.providerId]);
+            let result = await run("SELECT EXISTS(SELECT * FROM `user` WHERE `provider` = ? AND `providerId` = ?);", [data.provider, data.providerId]);
             return Boolean(Object.values(result[0])[0]);
         })
 
