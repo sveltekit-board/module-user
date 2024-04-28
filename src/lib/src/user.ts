@@ -7,32 +7,28 @@ export default class User {
 
     /**
      * user 테이블이 있는지, 테이블의 컬럼의 타입은 맞는지 체크합니다. 단, AUTO_INCREMENT 등의 **추가적인** 내용은 체크하지 않습니다.
-     * 만약 형식이 올바르지 않다면 해당 테이블을 DROP 합니다.
      * @returns 
      */
     static async checkTable(): Promise<boolean> {
         return await runQuery(async (run) => {
             const result = await run("SHOW TABLES");
-            if(result.length === 0){
+            if (result.length === 0) {
                 return false;
             }
-            
-            const tables = Object.values((result)[0]);
+
+            const tables = result.map((e: any) => Object.values(e)[0]);
             if (!tables.includes('user')) return false;
-            
-            const columns: any[] = await run("SHOW COLUMNS from `user`");
-            if (Object.values(userSchema).length !== Object.values(columns).length) return false;
-            
-            const isCorrect =  Object.keys(userSchema).every((key) => {
-                const b =  columns.find(r => r.Field === key)?.Type === userSchema[key as keyof typeof userSchema];
-                return b;
+
+            const columns: any[] = Object.values(await run("SHOW COLUMNS from `user`"));
+            if (userSchema.length > columns.length) return false;
+
+            return userSchema.every(u => {
+                const column = columns.find(c => c.Field === u.Field);
+                if(!column) return false;
+                return Object.keys(u).every(key => {
+                    return u[key as keyof typeof u] === column[key];
+                })
             })
-
-            if(!isCorrect){
-                await run("DROP TABLE `user`")
-            }
-
-            return isCorrect;
         })
     }
     /**
@@ -51,13 +47,44 @@ export default class User {
                 \`nicknameChangedTime\` bigint(20) UNSIGNED DEFAULT NULL,
                 \`registerTime\` bigint(20) UNSIGNED NOT NULL,
                 \`grade\` tinyint(3) UNSIGNED NOT NULL,
-                \`profileImage\` mediumtext DEFAULT NULL
+                \`profileImage\` mediumtext DEFAULT NULL,
+                \`email\` text DEFAULT NULL
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
             `)
 
             await run("ALTER TABLE `user` ADD PRIMARY KEY (`order`);");
 
             await run("ALTER TABLE `user` MODIFY `order` int(11) NOT NULL AUTO_INCREMENT;");
+        })
+    }
+    /**
+     * 테이블에 오류가 있을 때 테이블을 올바르게 고칩니다. 에러 발생 시 수동으로 테이블을 수정해야합니다.
+     * @returns 
+     */
+    static async fixTable(){
+        return await runQuery(async(run) => {
+            const result = await run("SHOW TABLES");
+            const tables = result.map((e: any) => Object.values(e)[0]);
+            if (!tables.includes('user')){
+                return await this.createTable();
+            }
+
+            const columns: any[] = Object.values(await run("SHOW COLUMNS from `user`"));
+            for(const u of userSchema){
+                const column = columns.find(column => column.Field === u.Field);
+                if(u.Extra === "auto_increment" && column && u.Extra !== column.Extra){
+                    await run(`ALTER TABLE \`user\` DROP \`${u.Field}\``);
+                    await run(`ALTER TABLE \`user\` ADD \`${u.Field}\` ${u.Type}${u.Default? ` DEFAULT '${u.Default}'`:''}${u.Null === "NO"? ' NOT NULL' : ''}${u.Extra === "auto_increment"? ` AUTO_INCREMENT FIRST, ADD PRIMARY KEY (\`${u.Field}\`)` : ''};`);
+                    continue;
+                }
+                if(!column){
+                    await run(`ALTER TABLE \`user\` ADD \`${u.Field}\` ${u.Type}${u.Default? ` DEFAULT '${u.Default}'`:''}${u.Null === "NO"? ' NOT NULL' : ''}${u.Extra === "auto_increment"? ` AUTO_INCREMENT FIRST, ADD PRIMARY KEY (\`${u.Field}\`)` : ''};`);
+                    continue;
+                }
+                if(column.Type !== u.Type || u.Default !== column.Default || u.Null !== column.Null){
+                    await run(`ALTER TABLE \`user\` CHANGE \`${u.Field}\` \`${u.Field}\` ${u.Type}${u.Default? ` DEFAULT '${u.Default}'`:''}${u.Null === "NO"? ' NOT NULL' : ''};`);
+                }
+            }
         })
     }
     /**
@@ -106,26 +133,26 @@ export default class User {
         this.provider = provider;
         this.providerId = providerId;
     }
-    
+
     /**
      * db에서 유저 데이터를 가져와 반환합니다.
      * @param {undefined | string[]} columns 가져올 열의 이름을 배열로 나타냅니다. 파라미터가 없으면 모든 열을 가져옵니다.
      * @returns 
      */
     async getData(): Promise<UserMethodResult<UserData>>
-    async getData(columns:string[]): Promise<UserMethodResult<Partial<UserData>>>
-    async getData(columns?:string[]): Promise<UserMethodResult> {
-        let result = await runQuery(async(run) => {
-            if(columns){
+    async getData(columns: string[]): Promise<UserMethodResult<Partial<UserData>>>
+    async getData(columns?: string[]): Promise<UserMethodResult> {
+        let result = await runQuery(async (run) => {
+            if (columns) {
                 const columnQuery = columns.map(e => `\`${e}\``).join(' ,')
                 return await run("SELECT " + columnQuery + " FROM `user` WHERE `provider` = ?, `providerId` = ?", [this.provider, this.providerId]);
             }
-            else{
+            else {
                 return await run("SELECT * FROM `user` WHERE `provider` = ?, `providerId` = ?", [this.provider, this.providerId]);
             }
         })
 
-        if(result.length === 0){
+        if (result.length === 0) {
             return {
                 success: false,
                 error: 'USER_DOES_NOT_EXISTS'
@@ -276,14 +303,85 @@ export default class User {
     }
 }
 
-const userSchema = {
-    'order': 'int(11)',
-    'provider': 'tinytext',
-    'providerId': 'text',
-    'name': 'tinytext',
-    'nickname': 'tinytext',
-    'nicknameChangedTime': 'bigint(20) unsigned',
-    'registerTime': 'bigint(20) unsigned',
-    'grade': 'tinyint(3) unsigned',
-    'profileImage': 'mediumtext'
-}
+const userSchema = [
+    {
+        "Field": "order",
+        "Type": "int(11)",
+        "Null": "NO",
+        "Key": "PRI",
+        "Default": null,
+        "Extra": "auto_increment"
+    },
+    {
+        "Field": "provider",
+        "Type": "tinytext",
+        "Null": "NO",
+        "Key": "",
+        "Default": null,
+        "Extra": ""
+    },
+    {
+        "Field": "providerId",
+        "Type": "text",
+        "Null": "NO",
+        "Key": "",
+        "Default": null,
+        "Extra": ""
+    },
+    {
+        "Field": "name",
+        "Type": "tinytext",
+        "Null": "YES",
+        "Key": "",
+        "Default": null,
+        "Extra": ""
+    },
+    {
+        "Field": "nickname",
+        "Type": "tinytext",
+        "Null": "NO",
+        "Key": "",
+        "Default": null,
+        "Extra": ""
+    },
+    {
+        "Field": "nicknameChangedTime",
+        "Type": "bigint(20) unsigned",
+        "Null": "YES",
+        "Key": "",
+        "Default": null,
+        "Extra": ""
+    },
+    {
+        "Field": "registerTime",
+        "Type": "bigint(20) unsigned",
+        "Null": "NO",
+        "Key": "",
+        "Default": null,
+        "Extra": ""
+    },
+    {
+        "Field": "grade",
+        "Type": "tinyint(3) unsigned",
+        "Null": "NO",
+        "Key": "",
+        "Default": null,
+        "Extra": ""
+    },
+    {
+        "Field": "profileImage",
+        "Type": "mediumtext",
+        "Null": "YES",
+        "Key": "",
+        "Default": null,
+        "Extra": ""
+    },
+    {
+        "Field": "email",
+        "Type": "text",
+        "Null": "YES",
+        "Key": "",
+        "Default": null,
+        "Extra": ""
+    }
+]
